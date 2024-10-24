@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Care Dashboard</title>
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/jquery.dataTables.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.1.2/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.2/firebase-database.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+    <style>
+        #latest-call {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Customer Care Dashboard</h1>
+
+    <div id="latest-call">No ongoing calls...</div>
+
+    <table id="customersTable" class="display">
+        <thead>
+            <tr>
+                <th>Customer Number</th>
+                <th>Status</th>
+                <th>Assigned Executive</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <table id="executivesTable" class="display">
+        <thead>
+            <tr>
+                <th>Executive ID</th>
+                <th>Phone</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAD9kKMnzKUejBi4eP1Iv5Pb81czb9Fx3Y",
+            authDomain: "chicken-stew.firebaseapp.com",
+            databaseURL: "https://chicken-stew-default-rtdb.firebaseio.com",
+            projectId: "chicken-stew",
+            storageBucket: "chicken-stew.appspot.com",
+            messagingSenderId: "603936893086",
+            appId: "1:603936893086:web:c49d62e35179615367338f",
+            measurementId: "G-21TXYG0RKJ"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.database(app);
+
+        // Initialize DataTables
+        const customersTable = $('#customersTable').DataTable();
+        const executivesTable = $('#executivesTable').DataTable();
+
+        // Listen for real-time updates on call logs
+        db.ref('/calllogs/').on('value', (snapshot) => {
+            const logs = snapshot.val();
+            customersTable.clear();
+            let latestCall = 'No ongoing calls...';
+            if (logs) {
+                Object.entries(logs).forEach(([callId, callData]) => {
+                    customersTable.row.add([
+                        callData.receiver,
+                        callData.status,
+                        callData.executive
+                    ]).draw(false);
+
+                    // Update latest call details
+                    latestCall = `Latest Call: ${callData.receiver} | Status: ${callData.status} | Executive: ${callData.executive}`;
+                });
+            }
+            $('#latest-call').text(latestCall);
+        });
+
+        // Listen for real-time updates on customer care executives
+        db.ref('/cexecutives/').on('value', (snapshot) => {
+            const executives = snapshot.val();
+            executivesTable.clear();
+            if (executives) {
+                Object.entries(executives).forEach(([execId, execData]) => {
+                    executivesTable.row.add([
+                        execId,
+                        execData.phone,
+                        execData.busy ? 'Busy' : 'Available'
+                    ]).draw(false);
+                });
+            }
+        });
+    </script>
+</body>
+</html>
