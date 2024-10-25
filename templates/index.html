@@ -33,11 +33,21 @@
             background: var(--primary-color);
             border: none;
             border-radius: 4px;
+            cursor:pointer;
         }
         .container{
             padding: 20px 4vw;
             width: 100%;
             box-sizing: border-box;
+            .header{
+                position:relative;
+                button{
+                    position:absolute;
+                    right:0;
+                    top:50%;
+                    transform:translateY(-50%)
+                }
+            }
             .a1{
                 display: flex;
                 align-items: flex-end;
@@ -148,7 +158,10 @@
 </head>
 <body>
     <div class="container">
-        <h1>Customer Care Dashboard</h1>
+        <div class="header">
+            <h1>Customer Care Dashboard</h1>
+            <button onclick="window.location.href='/manage-call'">Call Management</button>
+        </div>
         <div class="a1">
             <div class="b1">
                 <input type="file" id="fileInput" accept=".xlsx" />
