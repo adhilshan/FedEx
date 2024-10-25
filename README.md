@@ -71,13 +71,6 @@ A web application for managing customer care operations, allowing customer servi
 2. Fill in the "Executive Phone Number" and "Cybercell Phone Number" fields to add new entries.
 3. View ongoing calls and their statuses in the tables provided.
 
-## Contributing
-
-Contributions are welcome! If you'd like to contribute, please fork the repository and submit a pull request.
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgements
 
