@@ -96,8 +96,6 @@ def make_call():
                 'status': 'ongoing',
             })
 
-            mark_executive_busy(free_executive, True)
-
             time.sleep(interval / 1000)
 
             if interval > 200:
@@ -111,20 +109,6 @@ def make_call():
     customers_ref.delete()
 
     return {'message': 'Calls completed or ongoing'}, 200
-
-@app.route('/call-status', methods=['POST'])
-def call_status():
-    """Updates the call status in Firebase."""
-    call_sid = request.form.get('CallSid')
-    call_status = request.form.get('CallStatus')
-    
-    if call_sid:
-        if call_status == 'completed':
-            calllogs_ref.child(call_sid).delete()
-        else:
-            calllogs_ref.child(call_sid).update({'status': call_status})
-
-    return '', 200
 
 @app.route('/voice-response', methods=['POST'])
 def voice_response():
@@ -150,7 +134,8 @@ def gather_response():
         free_executive = find_free_executive()
         if free_executive:
             # Dial the executive and wait for their input
-            dial = Dial(action='/cont')
+            mark_executive_busy(free_executive, True)
+            dial = Dial(action='/ongoing-call')  # Change the action to ongoing-call
             dial.number(free_executive)
             response.append(dial)
             response.play('https://firebasestorage.googleapis.com/v0/b/chicken-stew.appspot.com/o/627275__tyops__calm-and-sad-%5BAudioTrimmer.com%5D.wav?alt=media&token=9911d20b-1924-4d24-86c2-59f78d161d5e')
@@ -165,16 +150,18 @@ def gather_response():
 
     return Response(str(response), mimetype='text/xml')
 
-@app.route('/cont', methods=['POST'])
-def cont():
-    """Prompts to transfer the call to Cyber Crime Department if '00' is pressed."""
+@app.route('/ongoing-call', methods=['POST'])
+def ongoing_call():
+    """Handles the ongoing call between customer and executive."""
     response = VoiceResponse()
-    response.say("Press 00 to transfer this call to the Mumbai Cyber Crime Department.", voice='alice')
+
+    # Inform the executive they are connected with the customer
+    response.say("You are now connected with the customer. Press 00 to transfer this call to the Mumbai Cyber Crime Department.", voice='alice')
     
     # Gather input from the customer care executive
-    gather = Gather(num_digits=2, action='/transfer-response', method='POST', timeout=10)
+    gather = Gather(num_digits=2, action='/transfer-response', method='POST', timeout=30)  # Extended timeout
     response.append(gather)
-    
+
     return Response(str(response), mimetype='text/xml')
 
 @app.route('/transfer-response', methods=['POST'])
@@ -191,18 +178,40 @@ def transfer_response():
         else:
             response.say('No available crime executives. Ending call.')
     else:
-        response.say('No transfer detected. Staying on the line with customer care.')
+        response.say('No transfer detected. Ending call.')
     
     response.hangup()
     return Response(str(response), mimetype='text/xml')
 
-def find_free_executive():
-    """Finds and returns a free customer care executive."""
-    executives = executives_ref.get()
-    for exec_id, exec_data in executives.items():
-        if not exec_data.get('busy'):
-            return exec_data.get('phone')
-    return None
+@app.route('/completed-call', methods=['POST'])
+def completed_call():
+    """Handles the call completion."""
+    response = VoiceResponse()
+    response.say("The call has ended. Thank you.")
+    return Response(str(response), mimetype='text/xml')
+
+@app.route('/call-status', methods=['POST'])
+def call_status():
+    """Updates the call status in Firebase and marks executives as free if calls are completed."""
+    call_sid = request.form.get('CallSid')
+    call_status = request.form.get('CallStatus')
+    
+    if call_sid:
+        if call_status == 'completed':
+            # Retrieve the executive associated with the completed call
+            executive_phone = get_executive_by_call_sid(call_sid)
+            if executive_phone:
+                mark_executive_busy(executive_phone, False)  # Set executive as free
+            calllogs_ref.child(call_sid).delete()
+        else:
+            calllogs_ref.child(call_sid).update({'status': call_status})
+
+    return '', 200
+
+def get_executive_by_call_sid(call_sid):
+    """Retrieves the executive's phone number associated with a given call SID."""
+    call_log = calllogs_ref.child(call_sid).get()
+    return call_log.get('executive') if call_log else None
 
 def find_free_crime_executive():
     """Finds and returns a free crime executive."""
@@ -218,6 +227,22 @@ def mark_executive_busy(exec_phone, busy):
     for exec_id, exec_data in executives.items():
         if exec_data.get('phone') == exec_phone:
             executives_ref.child(exec_id).update({'busy': busy})
+            break
+
+def find_free_executive():
+    """Finds and returns a free customer care executive."""
+    executives = executives_ref.get()
+    for exec_id, exec_data in executives.items():
+        if not exec_data.get('busy'):
+            return exec_data.get('phone')
+    return None
+
+def mark_crime_executive_busy(exec_phone, busy):
+    """Updates the busy status of a crime executive."""
+    crime_executives = crimeexecutives_ref.get()
+    for exec_id, exec_data in crime_executives.items():
+        if exec_data.get('phone') == exec_phone:
+            crimeexecutives_ref.child(exec_id).update({'busy': busy})
             break
 
 if __name__ == '__main__':
