@@ -35,7 +35,7 @@ if not firebase_admin._apps:
 
 app = Flask(__name__)
 
-RUN_URL = 'https://9eac-115-99-91-205.ngrok-free.app/'
+RUN_URL = 'https://c145-27-7-117-225.ngrok-free.app/'
 
 # Twilio Credentials
 account_sid = os.getenv('TWILIO_SDK_SID')
@@ -119,10 +119,10 @@ def voice_response():
     """Handles the initial voice response and call forwarding."""
     response = VoiceResponse()
     gather = Gather(num_digits=1, action='/gather-response', method='POST', timeout=15)
-    gather.say(initial_message)
+    gather.say(initial_message , voice='Polly.Amy')
     response.append(gather)
 
-    response.say('No input received. Goodbye.')
+    response.say('No input received. Goodbye.',voice='Polly.Amy')
     response.hangup()
 
     return Response(str(response), mimetype='text/xml')
@@ -134,7 +134,7 @@ def gather_response():
     response = VoiceResponse()
 
     if digits == '1':
-        response.say(hold_message)
+        response.say(hold_message,voice='Polly.Amy')
         free_executive = find_free_executive()
         if free_executive:
             # Dial the executive and wait for their input
@@ -143,13 +143,13 @@ def gather_response():
             dial.number(free_executive)
             response.append(dial)
             response.play('https://firebasestorage.googleapis.com/v0/b/chicken-stew.appspot.com/o/627275__tyops__calm-and-sad-%5BAudioTrimmer.com%5D.wav?alt=media&token=9911d20b-1924-4d24-86c2-59f78d161d5e')
-            response.say(hold_message)
+            response.say(hold_message,voice='Polly.Amy')
         else:
-            response.say('All customer care executives are busy. Please try again later.')
+            response.say('All customer care executives are busy. Please try again later.',voice='Polly.Amy')
 
         response.hangup()
     else:
-        response.say('Invalid input. Goodbye.')
+        response.say('Invalid input. Goodbye.',voice='Polly.Amy')
         response.hangup()
 
     return Response(str(response), mimetype='text/xml')
@@ -174,9 +174,9 @@ def transfer_response():
     
     if free_crime_exec:
         # Create a conference
-        conference_name = 'CrimeDepartmentConference'
+        conference_name = ' '
         response.dial().conference(conference_name)
-        response.say("You are now connected with the Cyber Crime Department.")
+        response.say("You are now connected with the Cyber Crime Department.",voice='Polly.Amy')
         
         client.calls.create(
             to=free_crime_exec,
@@ -184,7 +184,7 @@ def transfer_response():
             url=RUN_URL + '/conference-join'
         )
     else:
-        response.say("No available crime executives at the moment. Please try again later.")
+        response.say("No available crime executives at the moment. Please try again later.",voice='Polly.Amy')
     
     return Response(str(response), mimetype='text/xml')
 
@@ -201,7 +201,7 @@ def conference_join():
 def completed_call():
     """Handles the call completion."""
     response = VoiceResponse()
-    response.say("The call has ended. Thank you.")
+    response.say("The call has ended. Thank you.",voice='Polly.Amy')
     return Response(str(response), mimetype='text/xml')
 
 @app.route('/call-status', methods=['POST'])
