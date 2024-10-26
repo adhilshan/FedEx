@@ -7,6 +7,10 @@ import time
 import os
 from dotenv import load_dotenv
 import random
+from functools import wraps
+from flask import Flask, jsonify
+
+
 
 
 load_dotenv()
@@ -57,8 +61,38 @@ from_phone_numbers = [
 ]
 
 @app.route('/')
-def index():
+def login():
+    return render_template('login.html')
+
+
+@app.route('/get-firebase-config')
+def get_firebase_config():
+    return jsonify({
+        "apiKey": os.getenv('FIREBASE_API_KEY'),
+        "authDomain": os.getenv('FIREBASE_AUTH_DOMAIN'),
+        "projectId": os.getenv('FIREBASE_PROJECT_ID'),
+        "storageBucket": os.getenv('FIREBASE_STORAGE_BUCKET'),
+        "messagingSenderId": os.getenv('FIREBASE_MESSAGING_SENDER_ID'),
+        "appId": os.getenv('FIREBASE_APP_ID')
+    })
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session:
+            return redirect(url_for('index'))  # Redirect to login if not authenticated
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/protected')
+@login_required
+def protected():
+    return render_template('protected.html')
+
+@app.route('/home')
+def home():
     return render_template('index.html')
+
 @app.route('/manage-call')
 def manage_call():
     return render_template('manageCall.html')
