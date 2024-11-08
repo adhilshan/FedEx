@@ -39,7 +39,7 @@ if not firebase_admin._apps:
 
 app = Flask(__name__)
 
-RUN_URL = 'https://c145-27-7-117-225.ngrok-free.app/'
+RUN_URL = 'https://fedex-live.vercel.app/'
 
 # Twilio Credentials
 account_sid = os.getenv('TWILIO_SDK_SID')
@@ -64,31 +64,6 @@ from_phone_numbers = [
 def login():
     return render_template('login.html')
 
-
-@app.route('/get-firebase-config')
-def get_firebase_config():
-    return jsonify({
-        "apiKey": os.getenv('FIREBASE_API_KEY'),
-        "authDomain": os.getenv('FIREBASE_AUTH_DOMAIN'),
-        "projectId": os.getenv('FIREBASE_PROJECT_ID'),
-        "storageBucket": os.getenv('FIREBASE_STORAGE_BUCKET'),
-        "messagingSenderId": os.getenv('FIREBASE_MESSAGING_SENDER_ID'),
-        "appId": os.getenv('FIREBASE_APP_ID')
-    })
-
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user' not in session:
-            return redirect(url_for('index'))  # Redirect to login if not authenticated
-        return f(*args, **kwargs)
-    return decorated_function
-
-@app.route('/protected')
-@login_required
-def protected():
-    return render_template('protected.html')
-
 @app.route('/home')
 def home():
     return render_template('index.html')
@@ -97,15 +72,39 @@ def home():
 def manage_call():
     return render_template('manageCall.html')
 
+# Global variable to control the call process state
+is_paused = False
+
+@app.route('/call/pause', methods=['POST'])
+def pause_calls():
+    """Pauses outgoing calls."""
+    global is_paused
+    is_paused = True
+    return jsonify({"message": "Call process paused"}), 200
+
+@app.route('/call/play', methods=['POST'])
+def play_calls():
+    """Resumes outgoing calls from where it left off."""
+    global is_paused
+    is_paused = False
+    # Restart the calling process where it left off
+    # Use the remaining numbers to continue
+    return make_call()
+
 @app.route('/make-call', methods=['POST'])
 def make_call():
-    """Initiates call to all customer numbers."""
+    """Initiates or resumes calls to customer numbers."""
+    global is_paused
     customer_numbers = request.json.get('phoneNumbers', [])
     if not customer_numbers:
         return {'message': 'No customers to call'}, 200
 
     interval = 200
     for phone in customer_numbers:
+        if is_paused:
+            # Exit the loop if paused
+            break
+
         to = str(phone)
         if not to.startswith('+'):
             to = '+91' + to
@@ -119,10 +118,10 @@ def make_call():
         from_number = random.choice(from_phone_numbers)
         try:
             call = client.calls.create(
-                url= RUN_URL + '/voice-response',
+                url=RUN_URL + '/voice-response',
                 to=to,
-                from_= from_number,
-                status_callback= RUN_URL + '/call-status',
+                from_=from_number,
+                status_callback=RUN_URL + '/call-status',
                 status_callback_event=['completed', 'failed', 'busy', 'no-answer']
             )
 
@@ -144,9 +143,7 @@ def make_call():
         except Exception as e:
             print(f'Error: {e}')
 
-    customers_ref.delete()
-
-    return {'message': 'Calls completed or ongoing'}, 200
+    return {'message': 'Calls paused' if is_paused else 'Calls completed or ongoing'}, 200
 
 @app.route('/voice-response', methods=['POST'])
 def voice_response():
